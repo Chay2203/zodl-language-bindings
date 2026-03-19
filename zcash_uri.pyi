@@ -1,4 +1,4 @@
-"""Type stubs for the zcash_zip321 package."""
+"""Type stubs for the zcash_uri package."""
 
 from typing import Optional, Union
 

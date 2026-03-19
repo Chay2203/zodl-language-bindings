@@ -1,7 +1,7 @@
 """Tests for parsing ZIP-321 payment URIs."""
 
 import pytest
-from zcash_zip321 import TransactionRequest, Payment, ParseError
+from zcash_uri import TransactionRequest, Payment, ParseError
 
 # Valid test addresses from ZIP-321 spec / librustzcash tests
 SAPLING_ADDR = "ztestsapling1n65uaftvs2g7075q2x2a04shfk066u3lldzxsrprfrqtzxnhc9ps73v4lhx4l9yfxj46sl0q90k"

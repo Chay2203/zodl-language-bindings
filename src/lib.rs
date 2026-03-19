@@ -11,15 +11,15 @@ use zcash_protocol::value::Zatoshis;
 // Exception hierarchy: all inherit from Zip321Error
 // ---------------------------------------------------------------------------
 
-create_exception!(zcash_zip321, Zip321Error, pyo3::exceptions::PyException);
-create_exception!(zcash_zip321, ParseError, Zip321Error);
-create_exception!(zcash_zip321, InvalidBase64Error, Zip321Error);
-create_exception!(zcash_zip321, MemoTooLongError, Zip321Error);
-create_exception!(zcash_zip321, TooManyPaymentsError, Zip321Error);
-create_exception!(zcash_zip321, TransparentMemoError, Zip321Error);
-create_exception!(zcash_zip321, RecipientMissingError, Zip321Error);
-create_exception!(zcash_zip321, InvalidPaymentError, Zip321Error);
-create_exception!(zcash_zip321, InvalidAddressError, Zip321Error);
+create_exception!(zcash_uri, Zip321Error, pyo3::exceptions::PyException);
+create_exception!(zcash_uri, ParseError, Zip321Error);
+create_exception!(zcash_uri, InvalidBase64Error, Zip321Error);
+create_exception!(zcash_uri, MemoTooLongError, Zip321Error);
+create_exception!(zcash_uri, TooManyPaymentsError, Zip321Error);
+create_exception!(zcash_uri, TransparentMemoError, Zip321Error);
+create_exception!(zcash_uri, RecipientMissingError, Zip321Error);
+create_exception!(zcash_uri, InvalidPaymentError, Zip321Error);
+create_exception!(zcash_uri, InvalidAddressError, Zip321Error);
 
 /// Convert a zip321::Zip321Error into the appropriate Python exception.
 fn zip321_err_to_py(err: zip321::Zip321Error) -> PyErr {
@@ -123,7 +123,7 @@ impl PaymentData {
 // ---------------------------------------------------------------------------
 
 /// A single payment within a ZIP-321 transaction request.
-#[pyclass(module = "zcash_zip321")]
+#[pyclass(module = "zcash_uri")]
 #[derive(Clone, Debug)]
 struct Payment {
     data: PaymentData,
@@ -272,7 +272,7 @@ impl Payment {
 // ---------------------------------------------------------------------------
 
 /// A ZIP-321 transaction request containing one or more payments.
-#[pyclass(module = "zcash_zip321")]
+#[pyclass(module = "zcash_uri")]
 #[derive(Clone, Debug)]
 struct TransactionRequest {
     payment_data: BTreeMap<usize, PaymentData>,
@@ -396,7 +396,7 @@ fn memo_from_base64(encoded: &str) -> PyResult<Vec<u8>> {
 // ---------------------------------------------------------------------------
 
 #[pymodule]
-fn zcash_zip321(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn zcash_uri(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Classes
     m.add_class::<Payment>()?;
     m.add_class::<TransactionRequest>()?;

@@ -1,7 +1,7 @@
 """Tests for error handling and exception hierarchy."""
 
 import pytest
-from zcash_zip321 import (
+from zcash_uri import (
     Payment,
     TransactionRequest,
     Zip321Error,

@@ -1,7 +1,7 @@
 """Round-trip tests: parse -> generate -> parse preserves data."""
 
 import pytest
-from zcash_zip321 import (
+from zcash_uri import (
     Payment,
     TransactionRequest,
     memo_to_base64,

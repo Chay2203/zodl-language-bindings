@@ -1,4 +1,4 @@
-# zcash-zip321
+# zcash-uri
 
 > **Alpha** -- API may change. Not yet audited for production use.
 
@@ -12,7 +12,7 @@ single and multi-recipient payments with amounts, memos, labels, and messages.
 ## Installation
 
 ```bash
-pip install zcash-zip321
+pip install zcash-uri
 ```
 
 ## Quick Start
@@ -20,7 +20,7 @@ pip install zcash-zip321
 ### Parse a payment URI
 
 ```python
-from zcash_zip321 import TransactionRequest
+from zcash_uri import TransactionRequest
 
 req = TransactionRequest.from_uri("zcash:zs1...?amount=1.5&memo=VGVzdA")
 
@@ -34,7 +34,7 @@ for idx, payment in req.payments().items():
 ### Build a payment URI
 
 ```python
-from zcash_zip321 import Payment, TransactionRequest
+from zcash_uri import Payment, TransactionRequest
 
 payment = Payment(
     recipient_address="zs1...",

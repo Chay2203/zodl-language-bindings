@@ -1,11 +1,11 @@
 """
-zcash-zip321: Python bindings for Zcash ZIP-321 payment request URIs.
+zcash-uri: Python bindings for Zcash ZIP-321 payment request URIs.
 
 Parse and generate Zcash payment URIs per the ZIP-321 specification.
 Wraps the reference Rust implementation from librustzcash via PyO3.
 """
 
-from zcash_zip321.zcash_zip321 import (
+from zcash_uri.zcash_uri import (
     # Core classes
     Payment,
     TransactionRequest,

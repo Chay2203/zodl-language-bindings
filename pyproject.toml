@@ -3,7 +3,7 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "zcash-zip321"
+name = "zcash-uri"
 version = "0.1.0"
 description = "Python bindings for Zcash ZIP-321 payment request URIs"
 license = { text = "MIT OR Apache-2.0" }
@@ -26,6 +26,6 @@ classifiers = [
 dev = ["pytest>=7.0", "maturin>=1.0"]
 
 [tool.maturin]
-python-packages = ["zcash_zip321"]
-module-name = "zcash_zip321.zcash_zip321"
+python-packages = ["zcash_uri"]
+module-name = "zcash_uri.zcash_uri"
 features = ["pyo3/extension-module"]
