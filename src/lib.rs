@@ -1,11 +1,12 @@
 use pyo3::prelude::*;
 use pyo3::create_exception;
-use pyo3::types::PyList;
+use pyo3::types::{PyDict, PyList};
 use std::collections::BTreeMap;
 
 use zcash_address::ZcashAddress;
 use zcash_protocol::memo::MemoBytes;
 use zcash_protocol::value::Zatoshis;
+use zcash_protocol::PoolType;
 
 // ---------------------------------------------------------------------------
 // Exception hierarchy: all inherit from Zip321Error
@@ -265,6 +266,27 @@ impl Payment {
             && self.data.label == other.data.label
             && self.data.message == other.data.message
     }
+
+    /// Return a dictionary representation of this payment.
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let d = PyDict::new(py);
+        d.set_item("recipient_address", &self.data.address)?;
+        d.set_item("amount_zatoshis", self.data.amount)?;
+        d.set_item(
+            "amount_zec",
+            self.data.amount.map(|a| a as f64 / ZEC_COIN as f64),
+        )?;
+        d.set_item(
+            "memo",
+            self.data
+                .memo
+                .as_ref()
+                .and_then(|m| std::str::from_utf8(m).ok().map(String::from)),
+        )?;
+        d.set_item("label", &self.data.label)?;
+        d.set_item("message", &self.data.message)?;
+        Ok(d)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +379,24 @@ impl TransactionRequest {
             .map(|opt| opt.map(|z| z as f64 / ZEC_COIN as f64))
     }
 
+    /// Return a dictionary representation of this transaction request.
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let d = PyDict::new(py);
+        let payments_list = PyList::empty(py);
+        for data in self.payment_data.values() {
+            let p = Payment { data: data.clone() };
+            payments_list.append(p.to_dict(py)?)?;
+        }
+        d.set_item("payments", payments_list)?;
+        let total = self.total_zatoshis()?;
+        d.set_item("total_zatoshis", total)?;
+        d.set_item(
+            "total_zec",
+            total.map(|z| z as f64 / ZEC_COIN as f64),
+        )?;
+        Ok(d)
+    }
+
     fn __len__(&self) -> usize {
         self.payment_data.len()
     }
@@ -392,6 +432,187 @@ fn memo_from_base64(encoded: &str) -> PyResult<Vec<u8>> {
 }
 
 // ---------------------------------------------------------------------------
+// Feature 1: Address Validation & Inspection
+// ---------------------------------------------------------------------------
+
+/// Information about a Zcash address.
+#[pyclass(module = "zcash_uri", get_all)]
+#[derive(Clone, Debug)]
+struct AddressInfo {
+    /// Whether the address is valid.
+    is_valid: bool,
+    /// The address type: "transparent", "sapling", "unified", "tex", or "unknown".
+    address_type: String,
+    /// Whether the address can receive memos.
+    can_receive_memo: bool,
+    /// List of pool types this address can receive to.
+    pools: Vec<String>,
+}
+
+#[pymethods]
+impl AddressInfo {
+    fn __repr__(&self) -> String {
+        format!(
+            "AddressInfo(is_valid={}, address_type={:?}, pools={:?})",
+            self.is_valid, self.address_type, self.pools
+        )
+    }
+}
+
+/// Validate a Zcash address and return detailed information about it.
+#[pyfunction]
+fn validate_address(address: &str) -> AddressInfo {
+    match ZcashAddress::try_from_encoded(address) {
+        Ok(addr) => {
+            let transparent = addr.can_receive_as(PoolType::TRANSPARENT);
+            let sapling = addr.can_receive_as(PoolType::SAPLING);
+            let orchard = addr.can_receive_as(PoolType::ORCHARD);
+
+            let mut pools = Vec::new();
+            if transparent {
+                pools.push("transparent".to_string());
+            }
+            if sapling {
+                pools.push("sapling".to_string());
+            }
+            if orchard {
+                pools.push("orchard".to_string());
+            }
+
+            let address_type = if pools.len() > 1 {
+                "unified".to_string()
+            } else if sapling {
+                "sapling".to_string()
+            } else if orchard {
+                "orchard".to_string()
+            } else if transparent {
+                "transparent".to_string()
+            } else {
+                "unknown".to_string()
+            };
+
+            AddressInfo {
+                is_valid: true,
+                address_type,
+                can_receive_memo: addr.can_receive_memo(),
+                pools,
+            }
+        }
+        Err(_) => AddressInfo {
+            is_valid: false,
+            address_type: "unknown".to_string(),
+            can_receive_memo: false,
+            pools: vec![],
+        },
+    }
+}
+
+/// Check whether a string is a valid Zcash address.
+#[pyfunction]
+fn is_valid_address(address: &str) -> bool {
+    ZcashAddress::try_from_encoded(address).is_ok()
+}
+
+// ---------------------------------------------------------------------------
+// Feature 2: Amount Conversion Utilities
+// ---------------------------------------------------------------------------
+
+/// Convert a ZEC amount (float) to zatoshis (int).
+///
+/// Raises ``InvalidPaymentError`` if the amount is negative or exceeds 21M ZEC.
+#[pyfunction]
+fn zec_to_zatoshis(zec: f64) -> PyResult<u64> {
+    if zec < 0.0 {
+        return Err(InvalidPaymentError::new_err("Amount cannot be negative"));
+    }
+    let zatoshis = (zec * ZEC_COIN as f64).round() as u64;
+    if zatoshis > MAX_MONEY {
+        return Err(InvalidPaymentError::new_err(format!(
+            "Amount {} ZEC exceeds maximum (21000000 ZEC)",
+            zec
+        )));
+    }
+    Ok(zatoshis)
+}
+
+/// Convert zatoshis (int) to ZEC (float).
+///
+/// Raises ``InvalidPaymentError`` if the value exceeds the maximum.
+#[pyfunction]
+fn zatoshis_to_zec(zatoshis: u64) -> PyResult<f64> {
+    if zatoshis > MAX_MONEY {
+        return Err(InvalidPaymentError::new_err(format!(
+            "Amount {zatoshis} exceeds maximum ({MAX_MONEY})"
+        )));
+    }
+    Ok(zatoshis as f64 / ZEC_COIN as f64)
+}
+
+/// Format a zatoshi amount as a human-readable ZEC string.
+///
+/// Example: ``format_zec(150000000)`` → ``"1.50000000 ZEC"``
+#[pyfunction]
+fn format_zec(zatoshis: u64) -> PyResult<String> {
+    if zatoshis > MAX_MONEY {
+        return Err(InvalidPaymentError::new_err(format!(
+            "Amount {zatoshis} exceeds maximum ({MAX_MONEY})"
+        )));
+    }
+    let whole = zatoshis / ZEC_COIN;
+    let frac = zatoshis % ZEC_COIN;
+    Ok(format!("{whole}.{frac:08} ZEC"))
+}
+
+// ---------------------------------------------------------------------------
+// Feature 3: AI-Friendly examples()
+// ---------------------------------------------------------------------------
+
+/// Return working code examples for all major library features.
+///
+/// Useful for AI assistants and interactive exploration.
+#[pyfunction]
+fn examples() -> String {
+    r#"# zcash-uri — Quick Examples
+
+## 1. Parse a ZIP-321 URI
+from zcash_uri import TransactionRequest
+req = TransactionRequest.from_uri("zcash:ztestsapling1n65uaftvs2g7075q2x2a04shfk066u3lldzxsrprfrqtzxnhc9ps73v4lhx4l9yfxj46sl0q90k?amount=1.5")
+for idx, p in req.payments().items():
+    print(f"  Pay {p.amount_zec} ZEC → {p.recipient_address}")
+
+## 2. Build a payment URI
+from zcash_uri import Payment, TransactionRequest
+p = Payment("ztestsapling1n65uaftvs2g7075q2x2a04shfk066u3lldzxsrprfrqtzxnhc9ps73v4lhx4l9yfxj46sl0q90k", amount_zatoshis=250_000_000, memo="Thanks!")
+print(TransactionRequest([p]).to_uri())
+
+## 3. Multi-recipient payment
+p1 = Payment("ztestsapling1n65uaftvs2g7075q2x2a04shfk066u3lldzxsrprfrqtzxnhc9ps73v4lhx4l9yfxj46sl0q90k", amount_zatoshis=100_000_000)
+p2 = Payment("ztestsapling10yy2ex5dcqkclhc7z7yrnjq2z6feyjad56ptwlfgmy77dmaqqrl9gyhprdx59qgmsnyfska2kez", amount_zatoshis=200_000_000)
+req = TransactionRequest([p1, p2])
+print(f"Total: {req.total_zec()} ZEC")
+
+## 4. Validate an address
+from zcash_uri import validate_address, is_valid_address
+info = validate_address("ztestsapling1n65uaftvs2g7075q2x2a04shfk066u3lldzxsrprfrqtzxnhc9ps73v4lhx4l9yfxj46sl0q90k")
+print(f"Valid: {info.is_valid}, Type: {info.address_type}, Pools: {info.pools}")
+print(is_valid_address("not-an-address"))  # False
+
+## 5. Amount utilities
+from zcash_uri import zec_to_zatoshis, zatoshis_to_zec, format_zec
+print(zec_to_zatoshis(1.5))      # 150000000
+print(zatoshis_to_zec(150000000)) # 1.5
+print(format_zec(150000000))      # "1.50000000 ZEC"
+
+## 6. Serialize payment to dict
+p = Payment("ztestsapling1n65uaftvs2g7075q2x2a04shfk066u3lldzxsrprfrqtzxnhc9ps73v4lhx4l9yfxj46sl0q90k", amount_zatoshis=100_000_000)
+print(p.to_dict())
+req = TransactionRequest([p])
+print(req.to_dict())
+"#
+    .to_string()
+}
+
+// ---------------------------------------------------------------------------
 // Module registration
 // ---------------------------------------------------------------------------
 
@@ -400,10 +621,17 @@ fn zcash_uri(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Classes
     m.add_class::<Payment>()?;
     m.add_class::<TransactionRequest>()?;
+    m.add_class::<AddressInfo>()?;
 
     // Functions
     m.add_function(wrap_pyfunction!(memo_to_base64, m)?)?;
     m.add_function(wrap_pyfunction!(memo_from_base64, m)?)?;
+    m.add_function(wrap_pyfunction!(validate_address, m)?)?;
+    m.add_function(wrap_pyfunction!(is_valid_address, m)?)?;
+    m.add_function(wrap_pyfunction!(zec_to_zatoshis, m)?)?;
+    m.add_function(wrap_pyfunction!(zatoshis_to_zec, m)?)?;
+    m.add_function(wrap_pyfunction!(format_zec, m)?)?;
+    m.add_function(wrap_pyfunction!(examples, m)?)?;
 
     // Exceptions
     m.add("Zip321Error", m.py().get_type::<Zip321Error>())?;
