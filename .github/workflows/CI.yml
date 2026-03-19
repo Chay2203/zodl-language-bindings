@@ -20,12 +20,19 @@ jobs:
           python-version: "3.12"
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Install maturin
-        run: pip install maturin[patchelf] pytest
+      - name: Create virtualenv and install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install maturin[patchelf] pytest
       - name: Build and install
-        run: maturin develop
+        run: |
+          source .venv/bin/activate
+          maturin develop
       - name: Run tests
-        run: pytest tests/ -v
+        run: |
+          source .venv/bin/activate
+          pytest tests/ -v
 
   linux:
     runs-on: ubuntu-latest
