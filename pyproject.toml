@@ -1,0 +1,31 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "zcash-zip321"
+version = "0.1.0"
+description = "Python bindings for Zcash ZIP-321 payment request URIs"
+license = { text = "MIT OR Apache-2.0" }
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "maturin>=1.0"]
+
+[tool.maturin]
+python-packages = ["zcash_zip321"]
+module-name = "zcash_zip321.zcash_zip321"
+features = ["pyo3/extension-module"]
